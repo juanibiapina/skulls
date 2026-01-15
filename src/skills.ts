@@ -85,6 +85,7 @@ export async function discoverSkills(basePath: string, subpath?: string): Promis
     join(searchPath, '.claude/skills'),
     join(searchPath, '.opencode/skill'),
     join(searchPath, '.cursor/skills'),
+    join(searchPath, '.github/skills'),
   ];
 
   for (const dir of prioritySearchDirs) {

@@ -21,17 +21,37 @@ interface Options {
 
 program
   .name('add-skill')
-  .description('Install skills onto coding agents (OpenCode, Claude Code, Codex, Cursor)')
+  .description('Install skills onto coding agents (OpenCode, Claude Code, Codex, Cursor, VSCode)')
   .version(version)
   .argument('<source>', 'Git repo URL, GitHub shorthand (owner/repo), or direct path to skill')
   .option('-g, --global', 'Install skill globally (user-level) instead of project-level')
-  .option('-a, --agent <agents...>', 'Specify agents to install to (opencode, claude-code, codex, cursor)')
+  .option('-a, --agent <agents...>', 'Specify agents to install to (opencode, claude-code, codex, cursor, vscode)')
   .option('-s, --skill <skills...>', 'Specify skill names to install (skip selection prompt)')
   .option('-l, --list', 'List available skills in the repository without installing')
   .option('-y, --yes', 'Skip confirmation prompts')
   .action(async (source: string, options: Options) => {
     await main(source, options);
   });
+
+program.configureOutput({
+  outputError: (str, write) => {
+    if (str.includes("missing required argument 'source'")) {
+      console.log();
+      console.log(chalk.red('Error: Missing skill source'));
+      console.log();
+      console.log('Usage:');
+      console.log(`  ${chalk.cyan('npx add-skill <source>')} ${chalk.dim('[options]')}`);
+      console.log();
+      console.log('Example:');
+      console.log(`  ${chalk.dim('$')} npx add-skill vercel-labs/agent-skills`);
+      console.log();
+      console.log(`Run ${chalk.cyan('npx add-skill --help')} for more options.`);
+      console.log();
+    } else {
+      write(str);
+    }
+  }
+});
 
 program.parse();
 
@@ -131,7 +151,7 @@ async function main(source: string, options: Options) {
     let targetAgents: AgentType[];
 
     if (options.agent && options.agent.length > 0) {
-      const validAgents = ['opencode', 'claude-code', 'codex', 'cursor'];
+      const validAgents = ['opencode', 'claude-code', 'codex', 'cursor', 'vscode'];
       const invalidAgents = options.agent.filter(a => !validAgents.includes(a));
 
       if (invalidAgents.length > 0) {
@@ -149,7 +169,7 @@ async function main(source: string, options: Options) {
 
       if (installedAgents.length === 0) {
         if (options.yes) {
-          targetAgents = ['opencode', 'claude-code', 'codex', 'cursor'];
+          targetAgents = ['opencode', 'claude-code', 'codex', 'cursor', 'vscode'];
           p.log.info('Installing to all agents (none detected)');
         } else {
           p.log.warn('No coding agents detected. You can still install skills.');

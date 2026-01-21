@@ -1,25 +1,53 @@
 #!/usr/bin/env node
 
-import { program } from "commander";
-import * as p from "@clack/prompts";
-import chalk from "chalk";
-import { parseSource } from "./source-parser.js";
-import { cloneRepo, cleanupTempDir } from "./git.js";
-import { discoverSkills, getSkillDisplayName } from "./skills.js";
+import { program } from 'commander';
+import * as p from '@clack/prompts';
+import chalk from 'chalk';
+import { parseSource, getOwnerRepo } from './source-parser.js';
+import { cloneRepo, cleanupTempDir } from './git.js';
+import { discoverSkills, getSkillDisplayName } from './skills.js';
 import {
   installSkillForAgent,
   isSkillInstalled,
+  getCanonicalPath,
   getInstallPath,
   installMintlifySkillForAgent,
   installRemoteSkillForAgent,
   type InstallMode,
-} from "./installer.js";
-import { detectInstalledAgents, agents } from "./agents.js";
-import { track, setVersion } from "./telemetry.js";
-import { fetchMintlifySkill } from "./mintlify.js";
-import { findProvider } from "./providers/index.js";
-import type { Skill, AgentType, MintlifySkill, RemoteSkill } from "./types.js";
-import packageJson from "../package.json" with { type: "json" };
+} from './installer.js';
+import { homedir } from 'os';
+import { detectInstalledAgents, agents } from './agents.js';
+import { track, setVersion } from './telemetry.js';
+import { fetchMintlifySkill } from './mintlify.js';
+import { findProvider } from './providers/index.js';
+import type { Skill, AgentType, MintlifySkill, RemoteSkill } from './types.js';
+import packageJson from '../package.json' with { type: 'json' };
+
+/**
+ * Shortens a path for display: replaces homedir with ~ and cwd with .
+ */
+function shortenPath(fullPath: string, cwd: string): string {
+  const home = homedir();
+  if (fullPath.startsWith(home)) {
+    return fullPath.replace(home, '~');
+  }
+  if (fullPath.startsWith(cwd)) {
+    return '.' + fullPath.slice(cwd.length);
+  }
+  return fullPath;
+}
+
+/**
+ * Formats a list of items, truncating if too many
+ */
+function formatList(items: string[], maxShow: number = 5): string {
+  if (items.length <= maxShow) {
+    return items.join(', ');
+  }
+  const shown = items.slice(0, maxShow);
+  const remaining = items.length - maxShow;
+  return `${shown.join(', ')} +${remaining} more`;
+}
 
 const version = packageJson.version;
 setVersion(version);
@@ -60,6 +88,7 @@ program
     "List available skills in the repository without installing",
   )
   .option("-y, --yes", "Skip confirmation prompts")
+  .option('--all', 'Install all skills to all agents without any prompts (implies -y -g)')
   .configureOutput({
     outputError: (str, write) => {
       if (str.includes("missing required argument")) {
@@ -931,50 +960,45 @@ async function main(source: string, options: Options) {
 
     const cwd = process.cwd();
     const summaryLines: string[] = [];
-
-    // Find the longest agent name for padding
-    const maxAgentLen = Math.max(
-      ...targetAgents.map((a) => agents[a].displayName.length),
-    );
-
-    // Check if any skill will be overwritten
     const overwriteStatus = new Map<string, Map<string, boolean>>();
     for (const skill of selectedSkills) {
       const agentStatus = new Map<string, boolean>();
       for (const agent of targetAgents) {
-        agentStatus.set(
-          agent,
-          await isSkillInstalled(skill.name, agent, {
-            global: installGlobally,
-          }),
-        );
+        agentStatus.set(agent, await isSkillInstalled(skill.name, agent, { global: installGlobally }));
       }
       overwriteStatus.set(skill.name, agentStatus);
     }
-
+    
+    const agentNames = targetAgents.map(a => agents[a].displayName);
+    const hasOverwrites = Array.from(overwriteStatus.values()).some(
+      agentMap => Array.from(agentMap.values()).some(v => v)
+    );
+    
     for (const skill of selectedSkills) {
-      if (summaryLines.length > 0) summaryLines.push(""); // separator between skills
-      summaryLines.push(chalk.bold.cyan(getSkillDisplayName(skill)));
-      summaryLines.push("");
-      summaryLines.push(
-        `  ${chalk.bold("Agent".padEnd(maxAgentLen + 2))}${chalk.bold("Directory")}`,
-      );
-
-      for (const agent of targetAgents) {
-        const fullPath = getInstallPath(skill.name, agent, {
-          global: installGlobally,
-        });
-        // Strip the skill name from the end to show just the base directory
-        const basePath = fullPath.replace(/\/[^/]+$/, "/");
-        const installed = overwriteStatus.get(skill.name)?.get(agent) ?? false;
-        const status = installed ? chalk.yellow(" (overwrite)") : "";
-        const agentName = agents[agent].displayName.padEnd(maxAgentLen + 2);
-        summaryLines.push(`  ${agentName}${chalk.dim(basePath)}${status}`);
+      if (summaryLines.length > 0) summaryLines.push('');
+      
+      if (installMode === 'symlink') {
+        const canonicalPath = getCanonicalPath(skill.name, { global: installGlobally });
+        const shortCanonical = shortenPath(canonicalPath, cwd);
+        summaryLines.push(`${chalk.cyan(shortCanonical)}`);
+        summaryLines.push(`  ${chalk.dim('symlink →')} ${formatList(agentNames)}`);
+      } else {
+        summaryLines.push(`${chalk.cyan(getSkillDisplayName(skill))}`);
+        summaryLines.push(`  ${chalk.dim('copy →')} ${formatList(agentNames)}`);
+      }
+      
+      const skillOverwrites = overwriteStatus.get(skill.name);
+      const overwriteAgents = targetAgents
+        .filter(a => skillOverwrites?.get(a))
+        .map(a => agents[a].displayName);
+      
+      if (overwriteAgents.length > 0) {
+        summaryLines.push(`  ${chalk.yellow('overwrites:')} ${formatList(overwriteAgents)}`);
       }
     }
-
+    
     console.log();
-    p.note(summaryLines.join("\n"), "Installation Summary");
+    p.note(summaryLines.join('\n'), 'Installation Summary');
 
     if (!options.yes) {
       const confirmed = await p.confirm({
@@ -988,21 +1012,13 @@ async function main(source: string, options: Options) {
       }
     }
 
-    spinner.start("Installing skills...");
+    spinner.start('Installing skills...');
 
-    const results: {
-      skill: string;
-      agent: string;
-      success: boolean;
-      path: string;
-      error?: string;
-    }[] = [];
+    const results: { skill: string; agent: string; success: boolean; path: string; canonicalPath?: string; mode: InstallMode; symlinkFailed?: boolean; error?: string }[] = [];
 
     for (const skill of selectedSkills) {
       for (const agent of targetAgents) {
-        const result = await installSkillForAgent(skill, agent, {
-          global: installGlobally,
-        });
+        const result = await installSkillForAgent(skill, agent, { global: installGlobally, mode: installMode });
         results.push({
           skill: getSkillDisplayName(skill),
           agent: agents[agent].displayName,
@@ -1011,27 +1027,36 @@ async function main(source: string, options: Options) {
       }
     }
 
-    spinner.stop("Installation complete");
+    spinner.stop('Installation complete');
 
     console.log();
-    const successful = results.filter((r) => r.success);
-    const failed = results.filter((r) => !r.success);
+    const successful = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
 
     const skillFiles: Record<string, string> = {};
     for (const skill of selectedSkills) {
-      // skill.path is absolute, compute relative from tempDir
-      const relativePath = skill.path.replace(tempDir + "/", "");
-      skillFiles[skill.name] = relativePath + "/SKILL.md";
+      let relativePath: string;
+      if (tempDir && skill.path === tempDir) {
+        relativePath = 'SKILL.md';
+      } else if (tempDir && skill.path.startsWith(tempDir + '/')) {
+        relativePath = skill.path.slice(tempDir.length + 1) + '/SKILL.md';
+      } else {
+        continue;
+      }
+      skillFiles[skill.name] = relativePath;
     }
 
-    track({
-      event: "install",
-      source,
-      skills: selectedSkills.map((s) => s.name).join(","),
-      agents: targetAgents.join(","),
-      ...(installGlobally && { global: "1" }),
-      skillFiles: JSON.stringify(skillFiles),
-    });
+    const normalizedSource = getOwnerRepo(parsed);
+    if (normalizedSource) {
+      track({
+        event: 'install',
+        source: normalizedSource,
+        skills: selectedSkills.map(s => s.name).join(','),
+        agents: targetAgents.join(','),
+        ...(installGlobally && { global: '1' }),
+        skillFiles: JSON.stringify(skillFiles),
+      });
+    }
 
     if (successful.length > 0) {
       const bySkill = new Map<string, typeof results>();
@@ -1040,33 +1065,49 @@ async function main(source: string, options: Options) {
         skillResults.push(r);
         bySkill.set(r.skill, skillResults);
       }
-
+      
       const skillCount = bySkill.size;
-      const agentCount = new Set(successful.map((r) => r.agent)).size;
-
-      // Build results list
+      const agentCount = new Set(successful.map(r => r.agent)).size;
+      const symlinkFailures = successful.filter(r => r.mode === 'symlink' && r.symlinkFailed);
+      const copiedAgents = symlinkFailures.map(r => r.agent);
       const resultLines: string[] = [];
-
-      for (const [skill, skillAgents] of bySkill) {
-        resultLines.push(`${chalk.green("✓")} ${chalk.bold(skill)}`);
-        for (const agent of skillAgents) {
-          resultLines.push(`  ${chalk.dim(agent)}`);
+      
+      for (const [skillName, skillResults] of bySkill) {
+        const firstResult = skillResults[0]!;
+        
+        if (firstResult.mode === 'copy') {
+          // Copy mode: show skill name and list all agent paths
+          resultLines.push(`${chalk.green('✓')} ${skillName} ${chalk.dim('(copied)')}`);
+          for (const r of skillResults) {
+            const shortPath = shortenPath(r.path, cwd);
+            resultLines.push(`  ${chalk.dim('→')} ${shortPath}`);
+          }
+        } else {
+          // Symlink mode: show canonical path and symlinked agents
+          if (firstResult.canonicalPath) {
+            const shortPath = shortenPath(firstResult.canonicalPath, cwd);
+            resultLines.push(`${chalk.green('✓')} ${shortPath}`);
+          }
+          const symlinked = skillResults.filter(r => !r.symlinkFailed).map(r => r.agent);
+          const copied = skillResults.filter(r => r.symlinkFailed).map(r => r.agent);
+          
+          if (symlinked.length > 0) {
+            resultLines.push(`  ${chalk.dim('symlink →')} ${formatList(symlinked)}`);
+          }
+          if (copied.length > 0) {
+            resultLines.push(`  ${chalk.yellow('copied →')} ${formatList(copied)}`);
+          }
         }
-        resultLines.push(""); // blank line between skills
       }
-
-      // Remove trailing blank line
-      if (
-        resultLines.length > 0 &&
-        resultLines[resultLines.length - 1] === ""
-      ) {
-        resultLines.pop();
+      
+      const title = chalk.green(`Installed ${skillCount} skill${skillCount !== 1 ? 's' : ''} to ${agentCount} agent${agentCount !== 1 ? 's' : ''}`);
+      p.note(resultLines.join('\n'), title);
+      
+      // Show symlink failure warning (only for symlink mode)
+      if (symlinkFailures.length > 0) {
+        p.log.warn(chalk.yellow(`Symlinks failed for: ${formatList(copiedAgents)}`));
+        p.log.message(chalk.dim('  Files were copied instead. On Windows, enable Developer Mode for symlink support.'));
       }
-
-      const title = chalk.green(
-        `Installed ${skillCount} skill${skillCount !== 1 ? "s" : ""} to ${agentCount} agent${agentCount !== 1 ? "s" : ""}`,
-      );
-      p.note(resultLines.join("\n"), title);
     }
 
     if (failed.length > 0) {

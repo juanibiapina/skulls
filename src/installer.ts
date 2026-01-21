@@ -13,7 +13,7 @@ interface InstallResult {
   success: boolean;
   path: string;
   canonicalPath?: string;
-  mode?: InstallMode;
+  mode: InstallMode;
   symlinkFailed?: boolean;
   error?: string;
 }
@@ -328,6 +328,7 @@ export async function installMintlifySkillForAgent(
     return {
       success: false,
       path: targetDir,
+      mode: 'copy',
       error: "Invalid skill name: potential path traversal detected",
     };
   }
@@ -339,11 +340,12 @@ export async function installMintlifySkillForAgent(
     const skillMdPath = join(targetDir, "SKILL.md");
     await writeFile(skillMdPath, skill.content, "utf-8");
 
-    return { success: true, path: targetDir };
+    return { success: true, path: targetDir, mode: 'copy' };
   } catch (error) {
     return {
       success: false,
       path: targetDir,
+      mode: 'copy',
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
@@ -374,6 +376,7 @@ export async function installRemoteSkillForAgent(
     return {
       success: false,
       path: targetDir,
+      mode: 'copy',
       error: "Invalid skill name: potential path traversal detected",
     };
   }
@@ -385,11 +388,12 @@ export async function installRemoteSkillForAgent(
     const skillMdPath = join(targetDir, "SKILL.md");
     await writeFile(skillMdPath, skill.content, "utf-8");
 
-    return { success: true, path: targetDir };
+    return { success: true, path: targetDir, mode: 'copy' };
   } catch (error) {
     return {
       success: false,
       path: targetDir,
+      mode: 'copy',
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }

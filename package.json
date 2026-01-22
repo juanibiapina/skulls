@@ -31,6 +31,7 @@
     "antigravity",
     "claude-code",
     "clawdbot",
+    "cline",
     "codex",
     "command-code",
     "cursor",
@@ -40,11 +41,15 @@
     "goose",
     "kilo",
     "kiro-cli",
+    "neovate",
     "opencode",
+    "openhands",
+    "pi",
+    "qoder",
     "roo",
     "trae",
     "windsurf",
-    "neovate"
+    "zencoder"
   ],
   "repository": {
     "type": "git",

@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 
 const AGENTS_DIR = '.agents';
 const LOCK_FILE = '.skill-lock.json';
-const CURRENT_VERSION = 2; // Bumped from 1 to 2 for content hash support
+const CURRENT_VERSION = 3; // Bumped from 2 to 3 for folder hash support (GitHub tree SHA)
 
 /**
  * Represents a single installed skill entry in the lock file.
@@ -19,8 +19,18 @@ export interface SkillLockEntry {
   sourceUrl: string;
   /** Subpath within the source repo, if applicable */
   skillPath?: string;
-  /** SHA-256 hash of the SKILL.md content at install time */
+  /**
+   * SHA-256 hash of the SKILL.md content at install time.
+   * @deprecated Use skillFolderHash for v3+. Kept for backwards compatibility during migration.
+   */
   contentHash: string;
+  /**
+   * GitHub tree SHA or computed folder hash for the entire skill folder.
+   * This hash changes when ANY file in the skill folder changes.
+   * For GitHub sources, this is the tree SHA from the Git Trees API.
+   * For other sources, this is computed from all file contents.
+   */
+  skillFolderHash?: string;
   /** ISO timestamp when the skill was first installed */
   installedAt: string;
   /** ISO timestamp when the skill was last updated */
@@ -62,9 +72,16 @@ export async function readSkillLock(): Promise<SkillLockFile> {
       return createEmptyLockFile();
     }
 
-    // If old version, wipe and start fresh (backwards incompatible change)
-    if (parsed.version < CURRENT_VERSION) {
+    // v2 -> v3 migration: v2 files are compatible, just missing skillFolderHash
+    // We don't wipe them; the check command will use contentHash as fallback
+    // Only wipe v1 files (pre-contentHash)
+    if (parsed.version < 2) {
       return createEmptyLockFile();
+    }
+
+    // Update version to current if needed (v2 -> v3 upgrade)
+    if (parsed.version < CURRENT_VERSION) {
+      parsed.version = CURRENT_VERSION;
     }
 
     return parsed;

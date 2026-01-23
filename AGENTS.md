@@ -69,13 +69,37 @@ description: What this skill does
 
 ### Skill Lock File
 
-The `skill-lock.json` file (managed by `src/skill-lock.ts`) tracks installed skills in each project. It stores:
+The `.skill-lock.json` file (at `~/.agents/.skill-lock.json`) tracks globally installed skills. Managed by `src/skill-lock.ts`.
 
-- Skill name and source (GitHub URL, local path, etc.)
-- Installation timestamp
-- Target agents the skill was installed for
+**Lock File Format (v2):**
+```json
+{
+  "version": 2,
+  "skills": {
+    "skill-name": {
+      "source": "owner/repo",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/owner/repo.git",
+      "skillPath": "skills/skill-name/SKILL.md",
+      "contentHash": "sha256-of-skill-md-content",
+      "installedAt": "...",
+      "updatedAt": "..."
+    }
+  }
+}
+```
 
-This allows `npx skills list` to show installed skills and `npx skills remove` to cleanly uninstall them.
+**Key fields:**
+- `contentHash`: SHA-256 hash of SKILL.md content, used by `skills check` to detect updates
+- `version`: Schema version. If < 2, lock file is wiped (old format lacked contentHash)
+
+**How hashes are computed:**
+```typescript
+import { createHash } from 'crypto';
+const hash = createHash('sha256').update(content, 'utf-8').digest('hex');
+```
+
+The hash is computed from raw SKILL.md content at install time and stored in the lock file. The `skills check` command sends this hash to the `/check-updates` API to compare against the latest content from GitHub.
 
 ### Provider System
 

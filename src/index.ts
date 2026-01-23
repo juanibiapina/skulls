@@ -400,11 +400,15 @@ async function handleRemoteSkill(
   // Add to skill lock file for update tracking (only for global installs)
   if (successful.length > 0 && installGlobally) {
     try {
+      // For remote skills, we only have the SKILL.md content
+      // The server will compute the full folder hash via GitHub Trees API
+      const contentHash = computeContentHash(remoteSkill.content);
       await addSkillToLock(remoteSkill.installName, {
         source: remoteSkill.sourceIdentifier,
         sourceType: remoteSkill.providerId,
         sourceUrl: url,
-        contentHash: computeContentHash(remoteSkill.content),
+        contentHash,
+        // skillFolderHash will be populated by server during update check
       });
     } catch {
       // Don't fail installation if lock file update fails
@@ -735,11 +739,14 @@ async function handleDirectUrlSkillLegacy(
   // Add to skill lock file for update tracking (only for global installs)
   if (successful.length > 0 && installGlobally) {
     try {
+      // For Mintlify skills, we only have the SKILL.md content
+      const contentHash = computeContentHash(mintlifySkill.content);
       await addSkillToLock(mintlifySkill.mintlifySite, {
         source: `mintlify/${mintlifySkill.mintlifySite}`,
         sourceType: 'mintlify',
         sourceUrl: url,
-        contentHash: computeContentHash(mintlifySkill.content),
+        contentHash,
+        // skillFolderHash will be populated by server during update check
       });
     } catch {
       // Don't fail installation if lock file update fails
@@ -1195,12 +1202,15 @@ async function main(source: string, options: Options) {
         const skillDisplayName = getSkillDisplayName(skill);
         if (successfulSkillNames.has(skillDisplayName)) {
           try {
+            // Store contentHash for backwards compat
+            // Server will fetch skillFolderHash via GitHub Trees API
             await addSkillToLock(skill.name, {
               source: normalizedSource,
               sourceType: parsed.type,
               sourceUrl: parsed.url,
               skillPath: skillFiles[skill.name],
               contentHash: skill.rawContent ? computeContentHash(skill.rawContent) : '',
+              // skillFolderHash is populated by server via GitHub Trees API
             });
           } catch {
             // Don't fail installation if lock file update fails

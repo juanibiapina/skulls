@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, dirname, sep } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 
@@ -126,19 +126,20 @@ export async function fetchSkillFolderHash(
   ownerRepo: string,
   skillPath: string
 ): Promise<string | null> {
-  // Normalize the skill path - remove SKILL.md suffix to get folder path
-  // Handle both forward and backslash separators for cross-platform compatibility
-  let folderPath = skillPath;
-  if (folderPath.endsWith('/SKILL.md') || folderPath.endsWith('\\SKILL.md')) {
+  // Normalize to forward slashes first (for GitHub API compatibility)
+  let folderPath = skillPath.replace(/\\/g, '/');
+
+  // Remove SKILL.md suffix to get folder path
+  if (folderPath.endsWith('/SKILL.md')) {
     folderPath = folderPath.slice(0, -9);
   } else if (folderPath.endsWith('SKILL.md')) {
     folderPath = folderPath.slice(0, -8);
   }
-  if (folderPath.endsWith('/') || folderPath.endsWith('\\')) {
+
+  // Remove trailing slash
+  if (folderPath.endsWith('/')) {
     folderPath = folderPath.slice(0, -1);
   }
-  // Convert Windows backslashes to forward slashes for GitHub API
-  folderPath = folderPath.split(sep).join('/').split('\\').join('/');
 
   const branches = ['main', 'master'];
 

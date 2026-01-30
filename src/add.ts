@@ -4,6 +4,10 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { sep } from 'path';
 import { parseSource, getOwnerRepo, parseOwnerRepo, isRepoPrivate } from './source-parser.ts';
+import { searchMultiselect, cancelSymbol } from './prompts/search-multiselect.ts';
+
+// Helper to check if a value is a cancel symbol (works with both clack and our custom prompts)
+const isCancelled = (value: unknown): value is symbol => typeof value === 'symbol';
 
 /**
  * Check if a source identifier (owner/repo format) represents a private GitHub repo.
@@ -93,15 +97,15 @@ function multiselect<Value>(opts: {
 }
 
 /**
- * Prompts the user to select agents, pre-selecting the last used agents if available.
+ * Prompts the user to select agents using interactive search.
+ * Pre-selects the last used agents if available.
  * Saves the selection for future use.
  */
 export async function promptForAgents(
   message: string,
-  choices: Array<{ value: AgentType; label: string; hint?: string }>,
-  defaultToAll: boolean = false
+  choices: Array<{ value: AgentType; label: string; hint?: string }>
 ): Promise<AgentType[] | symbol> {
-  // Get last selected agents to pre-select, or default to all if specified
+  // Get last selected agents to pre-select
   let lastSelected: string[] | undefined;
   try {
     lastSelected = await getLastSelectedAgents();
@@ -111,29 +115,20 @@ export async function promptForAgents(
 
   const validAgents = choices.map((c) => c.value);
 
-  let initialValues: AgentType[];
+  let initialValues: AgentType[] = [];
 
   if (lastSelected && lastSelected.length > 0) {
     // Filter stored agents against currently valid agents
     initialValues = lastSelected.filter((a) => validAgents.includes(a as AgentType)) as AgentType[];
-
-    // If filtering results in empty list and we should default to all, do so
-    if (initialValues.length === 0 && defaultToAll) {
-      initialValues = validAgents;
-    }
-  } else {
-    // No history, default to all or empty based on flag
-    initialValues = defaultToAll ? validAgents : [];
   }
 
-  const selected = await multiselect({
+  const selected = await searchMultiselect({
     message,
-    options: choices,
-    required: true,
-    initialValues,
+    items: choices,
+    initialSelected: initialValues,
   });
 
-  if (!p.isCancel(selected)) {
+  if (!isCancelled(selected)) {
     // Save selection for next time
     try {
       await saveSelectedAgents(selected as string[]);
@@ -146,79 +141,20 @@ export async function promptForAgents(
 }
 
 /**
- * Two-step agent selection: first ask "all agents", "previously selected", or "select specific",
- * then show the multiselect only if user wants to select specific agents.
+ * Interactive agent selection using fuzzy search.
+ * Shows all agents (not just detected ones) and pre-selects previously used agents.
  */
-async function selectAgentsInteractive(
-  availableAgents: AgentType[],
-  options: { global?: boolean }
-): Promise<AgentType[] | symbol> {
-  // Check if we have previously selected agents
-  let lastSelected: string[] | undefined;
-  try {
-    lastSelected = await getLastSelectedAgents();
-  } catch {
-    // Silently ignore errors reading lock file
-  }
-
-  // Filter last selected to only include currently available agents
-  const validLastSelected = lastSelected?.filter((a) =>
-    availableAgents.includes(a as AgentType)
-  ) as AgentType[] | undefined;
-
-  // Build options list
-  const selectOptions: Array<{ value: string; label: string; hint: string }> = [];
-  const hasPrevious = validLastSelected && validLastSelected.length > 0;
-
-  // Add "Same as last time" option first if we have valid history (recommended)
-  if (hasPrevious) {
-    const agentNames = validLastSelected.map((a) => agents[a].displayName).join(', ');
-    selectOptions.push({
-      value: 'previous',
-      label: 'Same as last time (Recommended)',
-      hint: agentNames,
-    });
-  }
-
-  selectOptions.push({
-    value: 'all',
-    label: hasPrevious ? 'All detected agents' : 'All detected agents (Recommended)',
-    hint: `Install to all ${availableAgents.length} detected agents`,
-  });
-
-  selectOptions.push({
-    value: 'select',
-    label: 'Select specific agents',
-    hint: 'Choose which agents to install to',
-  });
-
-  // First step: ask if user wants all agents, previous selection, or to select specific ones
-  const installChoice = await p.select({
-    message: 'Install to',
-    options: selectOptions,
-  });
-
-  if (p.isCancel(installChoice)) {
-    return installChoice;
-  }
-
-  if (installChoice === 'all') {
-    return availableAgents;
-  }
-
-  if (installChoice === 'previous' && validLastSelected) {
-    return validLastSelected;
-  }
-
-  // Second step: show multiselect for specific agent selection
-  const agentChoices = availableAgents.map((a) => ({
+async function selectAgentsInteractive(options: {
+  global?: boolean;
+}): Promise<AgentType[] | symbol> {
+  const allAgents = Object.keys(agents) as AgentType[];
+  const agentChoices = allAgents.map((a) => ({
     value: a,
     label: agents[a].displayName,
     hint: `${options.global ? agents[a].globalSkillsDir : agents[a].skillsDir}`,
   }));
 
-  // Use helper to prompt with memory
-  return promptForAgents('Select agents to install skills to', agentChoices, false);
+  return promptForAgents('Which agents do you want to install to?', agentChoices);
 }
 
 const version = packageJson.version;
@@ -313,29 +249,27 @@ async function handleRemoteSkill(
 
     targetAgents = options.agent as AgentType[];
   } else {
-    spinner.start('Detecting installed agents...');
+    spinner.start('Loading agents...');
     const installedAgents = await detectInstalledAgents();
-    spinner.stop(
-      `Detected ${installedAgents.length} agent${installedAgents.length !== 1 ? 's' : ''}`
-    );
+    const totalAgents = Object.keys(agents).length;
+    spinner.stop(`${totalAgents} agents`);
 
     if (installedAgents.length === 0) {
       if (options.yes) {
         targetAgents = validAgents as AgentType[];
-        p.log.info('Installing to all agents (none detected)');
+        p.log.info('Installing to all agents');
       } else {
-        p.log.warn('No coding agents detected. You can still install skills.');
+        p.log.info('Select agents to install skills to');
 
         const allAgentChoices = Object.entries(agents).map(([key, config]) => ({
           value: key as AgentType,
           label: config.displayName,
         }));
 
-        // Use helper to prompt with memory (defaulting to all)
+        // Use helper to prompt with search
         const selected = await promptForAgents(
-          'Select agents to install skills to',
-          allAgentChoices,
-          true
+          'Which agents do you want to install to?',
+          allAgentChoices
         );
 
         if (p.isCancel(selected)) {
@@ -356,7 +290,7 @@ async function handleRemoteSkill(
         );
       }
     } else {
-      const selected = await selectAgentsInteractive(installedAgents, { global: options.global });
+      const selected = await selectAgentsInteractive({ global: options.global });
 
       if (p.isCancel(selected)) {
         p.cancel('Installation cancelled');
@@ -729,29 +663,27 @@ async function handleWellKnownSkills(
 
     targetAgents = options.agent as AgentType[];
   } else {
-    spinner.start('Detecting installed agents...');
+    spinner.start('Loading agents...');
     const installedAgents = await detectInstalledAgents();
-    spinner.stop(
-      `Detected ${installedAgents.length} agent${installedAgents.length !== 1 ? 's' : ''}`
-    );
+    const totalAgents = Object.keys(agents).length;
+    spinner.stop(`${totalAgents} agents`);
 
     if (installedAgents.length === 0) {
       if (options.yes) {
         targetAgents = validAgents as AgentType[];
-        p.log.info('Installing to all agents (none detected)');
+        p.log.info('Installing to all agents');
       } else {
-        p.log.warn('No coding agents detected. You can still install skills.');
+        p.log.info('Select agents to install skills to');
 
         const allAgentChoices = Object.entries(agents).map(([key, config]) => ({
           value: key as AgentType,
           label: config.displayName,
         }));
 
-        // Use helper to prompt with memory (defaulting to all)
+        // Use helper to prompt with search
         const selected = await promptForAgents(
-          'Select agents to install skills to',
-          allAgentChoices,
-          true
+          'Which agents do you want to install to?',
+          allAgentChoices
         );
 
         if (p.isCancel(selected)) {
@@ -772,7 +704,7 @@ async function handleWellKnownSkills(
         );
       }
     } else {
-      const selected = await selectAgentsInteractive(installedAgents, { global: options.global });
+      const selected = await selectAgentsInteractive({ global: options.global });
 
       if (p.isCancel(selected)) {
         p.cancel('Installation cancelled');
@@ -1119,29 +1051,27 @@ async function handleDirectUrlSkillLegacy(
 
     targetAgents = options.agent as AgentType[];
   } else {
-    spinner.start('Detecting installed agents...');
+    spinner.start('Loading agents...');
     const installedAgents = await detectInstalledAgents();
-    spinner.stop(
-      `Detected ${installedAgents.length} agent${installedAgents.length !== 1 ? 's' : ''}`
-    );
+    const totalAgents = Object.keys(agents).length;
+    spinner.stop(`${totalAgents} agents`);
 
     if (installedAgents.length === 0) {
       if (options.yes) {
         targetAgents = validAgents as AgentType[];
-        p.log.info('Installing to all agents (none detected)');
+        p.log.info('Installing to all agents');
       } else {
-        p.log.warn('No coding agents detected. You can still install skills.');
+        p.log.info('Select agents to install skills to');
 
         const allAgentChoices = Object.entries(agents).map(([key, config]) => ({
           value: key as AgentType,
           label: config.displayName,
         }));
 
-        // Use helper to prompt with memory (defaulting to all)
+        // Use helper to prompt with search
         const selected = await promptForAgents(
-          'Select agents to install skills to',
-          allAgentChoices,
-          true
+          'Which agents do you want to install to?',
+          allAgentChoices
         );
 
         if (p.isCancel(selected)) {
@@ -1162,7 +1092,7 @@ async function handleDirectUrlSkillLegacy(
         );
       }
     } else {
-      const selected = await selectAgentsInteractive(installedAgents, { global: options.global });
+      const selected = await selectAgentsInteractive({ global: options.global });
 
       if (p.isCancel(selected)) {
         p.cancel('Installation cancelled');
@@ -1560,29 +1490,27 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
 
       targetAgents = options.agent as AgentType[];
     } else {
-      spinner.start('Detecting installed agents...');
+      spinner.start('Loading agents...');
       const installedAgents = await detectInstalledAgents();
-      spinner.stop(
-        `Detected ${installedAgents.length} agent${installedAgents.length !== 1 ? 's' : ''}`
-      );
+      const totalAgents = Object.keys(agents).length;
+      spinner.stop(`${totalAgents} agents`);
 
       if (installedAgents.length === 0) {
         if (options.yes) {
           targetAgents = validAgents as AgentType[];
-          p.log.info('Installing to all agents (none detected)');
+          p.log.info('Installing to all agents');
         } else {
-          p.log.warn('No coding agents detected. You can still install skills.');
+          p.log.info('Select agents to install skills to');
 
           const allAgentChoices = Object.entries(agents).map(([key, config]) => ({
             value: key as AgentType,
             label: config.displayName,
           }));
 
-          // Use helper to prompt with memory (defaulting to all)
+          // Use helper to prompt with search
           const selected = await promptForAgents(
-            'Select agents to install skills to',
-            allAgentChoices,
-            true
+            'Which agents do you want to install to?',
+            allAgentChoices
           );
 
           if (p.isCancel(selected)) {
@@ -1604,7 +1532,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
           );
         }
       } else {
-        const selected = await selectAgentsInteractive(installedAgents, { global: options.global });
+        const selected = await selectAgentsInteractive({ global: options.global });
 
         if (p.isCancel(selected)) {
           p.cancel('Installation cancelled');

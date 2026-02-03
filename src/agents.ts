@@ -294,10 +294,10 @@ export const agents: Record<AgentType, AgentConfig> = {
   replit: {
     name: 'replit',
     displayName: 'Replit',
-    skillsDir: '.agent/skills',
+    skillsDir: '.agents/skills',
     globalSkillsDir: undefined,
     detectInstalled: async () => {
-      return existsSync(join(process.cwd(), '.agent'));
+      return existsSync(join(process.cwd(), '.agents'));
     },
   },
   roo: {

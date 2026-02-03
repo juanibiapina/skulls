@@ -237,7 +237,7 @@ Skills can be installed to any of these agents:
 | Pi | `pi` | `.pi/skills/` | `~/.pi/agent/skills/` |
 | Qoder | `qoder` | `.qoder/skills/` | `~/.qoder/skills/` |
 | Qwen Code | `qwen-code` | `.qwen/skills/` | `~/.qwen/skills/` |
-| Replit | `replit` | `.agent/skills/` | N/A (project-only) |
+| Replit | `replit` | `.agents/skills/` | N/A (project-only) |
 | Roo Code | `roo` | `.roo/skills/` | `~/.roo/skills/` |
 | Trae | `trae` | `.trae/skills/` | `~/.trae/skills/` |
 | Trae CN | `trae-cn` | `.trae/skills/` | `~/.trae-cn/skills/` |

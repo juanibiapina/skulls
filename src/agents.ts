@@ -387,3 +387,30 @@ export async function detectInstalledAgents(): Promise<AgentType[]> {
 export function getAgentConfig(type: AgentType): AgentConfig {
   return agents[type];
 }
+
+/**
+ * Returns agents that use the universal .agents/skills directory.
+ * These agents share a common skill location and don't need symlinks.
+ */
+export function getUniversalAgents(): AgentType[] {
+  return (Object.entries(agents) as [AgentType, AgentConfig][])
+    .filter(([_, config]) => config.skillsDir === '.agents/skills')
+    .map(([type]) => type);
+}
+
+/**
+ * Returns agents that use agent-specific skill directories (not universal).
+ * These agents need symlinks from the canonical .agents/skills location.
+ */
+export function getNonUniversalAgents(): AgentType[] {
+  return (Object.entries(agents) as [AgentType, AgentConfig][])
+    .filter(([_, config]) => config.skillsDir !== '.agents/skills')
+    .map(([type]) => type);
+}
+
+/**
+ * Check if an agent uses the universal .agents/skills directory.
+ */
+export function isUniversalAgent(type: AgentType): boolean {
+  return agents[type].skillsDir === '.agents/skills';
+}

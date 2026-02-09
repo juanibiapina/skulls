@@ -6,7 +6,7 @@ import { execSync } from 'child_process';
 
 const AGENTS_DIR = '.agents';
 const LOCK_FILE = '.skill-lock.json';
-const CURRENT_VERSION = 3; // Bumped from 2 to 3 for folder hash support (GitHub tree SHA)
+const CURRENT_VERSION = 3;
 
 /**
  * Represents a single installed skill entry in the lock file.
@@ -22,22 +22,12 @@ export interface SkillLockEntry {
   skillPath?: string;
   /**
    * GitHub tree SHA for the entire skill folder.
-   * This hash changes when ANY file in the skill folder changes.
-   * Fetched via GitHub Trees API by the telemetry server.
    */
   skillFolderHash: string;
   /** ISO timestamp when the skill was first installed */
   installedAt: string;
   /** ISO timestamp when the skill was last updated */
   updatedAt: string;
-}
-
-/**
- * Tracks dismissed prompts so they're not shown again.
- */
-export interface DismissedPrompts {
-  /** Dismissed the find-skills skill installation prompt */
-  findSkillsPrompt?: boolean;
 }
 
 /**
@@ -48,15 +38,10 @@ export interface SkillLockFile {
   version: number;
   /** Map of skill name to its lock entry */
   skills: Record<string, SkillLockEntry>;
-  /** Tracks dismissed prompts */
-  dismissed?: DismissedPrompts;
-  /** Last selected agents for installation */
-  lastSelectedAgents?: string[];
 }
 
 /**
  * Get the path to the global skill lock file.
- * Located at ~/.agents/.skill-lock.json
  */
 export function getSkillLockPath(): string {
   return join(homedir(), AGENTS_DIR, LOCK_FILE);
@@ -64,8 +49,6 @@ export function getSkillLockPath(): string {
 
 /**
  * Read the skill lock file.
- * Returns an empty lock file structure if the file doesn't exist.
- * Wipes the lock file if it's an old format (version < CURRENT_VERSION).
  */
 export async function readSkillLock(): Promise<SkillLockFile> {
   const lockPath = getSkillLockPath();
@@ -74,35 +57,28 @@ export async function readSkillLock(): Promise<SkillLockFile> {
     const content = await readFile(lockPath, 'utf-8');
     const parsed = JSON.parse(content) as SkillLockFile;
 
-    // Validate version - wipe if old format
     if (typeof parsed.version !== 'number' || !parsed.skills) {
       return createEmptyLockFile();
     }
 
-    // If old version, wipe and start fresh (backwards incompatible change)
-    // v3 adds skillFolderHash - we want fresh installs to populate it
     if (parsed.version < CURRENT_VERSION) {
       return createEmptyLockFile();
     }
 
     return parsed;
-  } catch (error) {
-    // File doesn't exist or is invalid - return empty
+  } catch {
     return createEmptyLockFile();
   }
 }
 
 /**
  * Write the skill lock file.
- * Creates the directory if it doesn't exist.
  */
 export async function writeSkillLock(lock: SkillLockFile): Promise<void> {
   const lockPath = getSkillLockPath();
 
-  // Ensure directory exists
   await mkdir(dirname(lockPath), { recursive: true });
 
-  // Write with pretty formatting for human readability
   const content = JSON.stringify(lock, null, 2);
   await writeFile(lockPath, content, 'utf-8');
 }
@@ -116,15 +92,8 @@ export function computeContentHash(content: string): string {
 
 /**
  * Get GitHub token from user's environment.
- * Tries in order:
- * 1. GITHUB_TOKEN environment variable
- * 2. GH_TOKEN environment variable
- * 3. gh CLI auth token (if gh is installed)
- *
- * @returns The token string or null if not available
  */
 export function getGitHubToken(): string | null {
-  // Check environment variables first
   if (process.env.GITHUB_TOKEN) {
     return process.env.GITHUB_TOKEN;
   }
@@ -132,7 +101,6 @@ export function getGitHubToken(): string | null {
     return process.env.GH_TOKEN;
   }
 
-  // Try gh CLI
   try {
     const token = execSync('gh auth token', {
       encoding: 'utf-8',
@@ -150,30 +118,20 @@ export function getGitHubToken(): string | null {
 
 /**
  * Fetch the tree SHA (folder hash) for a skill folder using GitHub's Trees API.
- * This makes ONE API call to get the entire repo tree, then extracts the SHA
- * for the specific skill folder.
- *
- * @param ownerRepo - GitHub owner/repo (e.g., "vercel-labs/agent-skills")
- * @param skillPath - Path to skill folder or SKILL.md (e.g., "skills/react-best-practices/SKILL.md")
- * @param token - Optional GitHub token for authenticated requests (higher rate limits)
- * @returns The tree SHA for the skill folder, or null if not found
  */
 export async function fetchSkillFolderHash(
   ownerRepo: string,
   skillPath: string,
   token?: string | null
 ): Promise<string | null> {
-  // Normalize to forward slashes first (for GitHub API compatibility)
   let folderPath = skillPath.replace(/\\/g, '/');
 
-  // Remove SKILL.md suffix to get folder path
   if (folderPath.endsWith('/SKILL.md')) {
     folderPath = folderPath.slice(0, -9);
   } else if (folderPath.endsWith('SKILL.md')) {
     folderPath = folderPath.slice(0, -8);
   }
 
-  // Remove trailing slash
   if (folderPath.endsWith('/')) {
     folderPath = folderPath.slice(0, -1);
   }
@@ -185,7 +143,7 @@ export async function fetchSkillFolderHash(
       const url = `https://api.github.com/repos/${ownerRepo}/git/trees/${branch}?recursive=1`;
       const headers: Record<string, string> = {
         Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'skills-cli',
+        'User-Agent': 'skulls-cli',
       };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -200,12 +158,10 @@ export async function fetchSkillFolderHash(
         tree: Array<{ path: string; type: string; sha: string }>;
       };
 
-      // If folderPath is empty, this is a root-level skill - use the root tree SHA
       if (!folderPath) {
         return data.sha;
       }
 
-      // Find the tree entry for the skill folder
       const folderEntry = data.tree.find(
         (entry) => entry.type === 'tree' && entry.path === folderPath
       );
@@ -301,43 +257,5 @@ function createEmptyLockFile(): SkillLockFile {
   return {
     version: CURRENT_VERSION,
     skills: {},
-    dismissed: {},
   };
-}
-
-/**
- * Check if a prompt has been dismissed.
- */
-export async function isPromptDismissed(promptKey: keyof DismissedPrompts): Promise<boolean> {
-  const lock = await readSkillLock();
-  return lock.dismissed?.[promptKey] === true;
-}
-
-/**
- * Mark a prompt as dismissed.
- */
-export async function dismissPrompt(promptKey: keyof DismissedPrompts): Promise<void> {
-  const lock = await readSkillLock();
-  if (!lock.dismissed) {
-    lock.dismissed = {};
-  }
-  lock.dismissed[promptKey] = true;
-  await writeSkillLock(lock);
-}
-
-/**
- * Get the last selected agents.
- */
-export async function getLastSelectedAgents(): Promise<string[] | undefined> {
-  const lock = await readSkillLock();
-  return lock.lastSelectedAgents;
-}
-
-/**
- * Save the selected agents to the lock file.
- */
-export async function saveSelectedAgents(agents: string[]): Promise<void> {
-  const lock = await readSkillLock();
-  lock.lastSelectedAgents = agents;
-  await writeSkillLock(lock);
 }

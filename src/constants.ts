@@ -1,3 +1,5 @@
-export const AGENTS_DIR = '.agents';
-export const SKILLS_SUBDIR = 'skills';
-export const UNIVERSAL_SKILLS_DIR = '.agents/skills';
+import { join } from 'path';
+import { homedir } from 'os';
+
+/** Default installation directory for skills */
+export const DEFAULT_SKILLS_DIR = join(homedir(), '.agents', 'skills');

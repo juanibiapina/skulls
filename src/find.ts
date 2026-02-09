@@ -7,9 +7,6 @@ const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[38;5;102m';
 const TEXT = '\x1b[38;5;145m';
-const CYAN = '\x1b[36m';
-const MAGENTA = '\x1b[35m';
-const YELLOW = '\x1b[33m';
 
 // API endpoint for skills search
 const SEARCH_API_BASE = process.env.SKILLS_API_URL || 'https://skills.sh';
@@ -130,13 +127,11 @@ async function runSearchPrompt(initialQuery = ''): Promise<SearchSkill | null> {
   }
 
   function triggerSearch(q: string): void {
-    // Always clear any pending debounce timer
     if (debounceTimer) {
       clearTimeout(debounceTimer);
       debounceTimer = null;
     }
 
-    // Always reset loading state when starting a new search
     loading = false;
 
     if (!q || q.length < 2) {
@@ -146,12 +141,9 @@ async function runSearchPrompt(initialQuery = ''): Promise<SearchSkill | null> {
       return;
     }
 
-    // Use API search for all queries (debounced)
     loading = true;
     render();
 
-    // Adaptive debounce: shorter queries = longer wait (user still typing)
-    // 2 chars: 250ms, 3 chars: 200ms, 4 chars: 150ms, 5+ chars: 150ms
     const debounceMs = Math.max(150, 350 - q.length * 50);
 
     debounceTimer = setTimeout(async () => {
@@ -168,7 +160,6 @@ async function runSearchPrompt(initialQuery = ''): Promise<SearchSkill | null> {
     }, debounceMs);
   }
 
-  // Trigger initial search if there's a query, then render
   if (initialQuery) {
     triggerSearch(initialQuery);
   }
@@ -181,7 +172,6 @@ async function runSearchPrompt(initialQuery = ''): Promise<SearchSkill | null> {
         process.stdin.setRawMode(false);
       }
       process.stdout.write(SHOW_CURSOR);
-      // Pause stdin to fully release it for child processes
       process.stdin.pause();
     }
 
@@ -189,14 +179,12 @@ async function runSearchPrompt(initialQuery = ''): Promise<SearchSkill | null> {
       if (!key) return;
 
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
-        // Cancel
         cleanup();
         resolve(null);
         return;
       }
 
       if (key.name === 'return') {
-        // Submit
         cleanup();
         resolve(results[selectedIndex] || null);
         return;
@@ -222,7 +210,6 @@ async function runSearchPrompt(initialQuery = ''): Promise<SearchSkill | null> {
         return;
       }
 
-      // Regular character input
       if (key.sequence && !key.ctrl && !key.meta && key.sequence.length === 1) {
         const char = key.sequence;
         if (char >= ' ' && char <= '~') {
@@ -236,9 +223,8 @@ async function runSearchPrompt(initialQuery = ''): Promise<SearchSkill | null> {
   });
 }
 
-// Parse owner/repo from a package string (for the find command)
+// Parse owner/repo from a package string
 function getOwnerRepoFromString(pkg: string): { owner: string; repo: string } | null {
-  // Handle owner/repo or owner/repo@skill
   const atIndex = pkg.lastIndexOf('@');
   const repoPath = atIndex > 0 ? pkg.slice(0, atIndex) : pkg;
   const match = repoPath.match(/^([^/]+)\/([^/]+)$/);
@@ -250,8 +236,6 @@ function getOwnerRepoFromString(pkg: string): { owner: string; repo: string } | 
 
 async function isRepoPublic(owner: string, repo: string): Promise<boolean> {
   const isPrivate = await isRepoPrivate(owner, repo);
-  // Return true only if we know it's public (isPrivate === false)
-  // Return false if private or unable to determine
   return isPrivate === false;
 }
 
@@ -259,14 +243,13 @@ export async function runFind(args: string[]): Promise<void> {
   const query = args.join(' ');
   const isNonInteractive = !process.stdin.isTTY;
   const agentTip = `${DIM}Tip: if running in a coding agent, follow these steps:${RESET}
-${DIM}  1) npx skills find [query]${RESET}
-${DIM}  2) npx skills add <owner/repo@skill>${RESET}`;
+${DIM}  1) npx skulls find [query]${RESET}
+${DIM}  2) npx skulls add <owner/repo@skill>${RESET}`;
 
   // Non-interactive mode: just print results and exit
   if (query) {
     const results = await searchSkillsAPI(query);
 
-    // Track telemetry for non-interactive search
     track({
       event: 'find',
       query,
@@ -278,7 +261,7 @@ ${DIM}  2) npx skills add <owner/repo@skill>${RESET}`;
       return;
     }
 
-    console.log(`${DIM}Install with${RESET} npx skills add <owner/repo@skill>`);
+    console.log(`${DIM}Install with${RESET} npx skulls add <owner/repo@skill>`);
     console.log();
 
     for (const skill of results.slice(0, 6)) {
@@ -290,14 +273,13 @@ ${DIM}  2) npx skills add <owner/repo@skill>${RESET}`;
     return;
   }
 
-  // Interactive mode - show tip only if running non-interactively (likely in a coding agent)
+  // Interactive mode
   if (isNonInteractive) {
     console.log(agentTip);
     console.log();
   }
   const selected = await runSearchPrompt();
 
-  // Track telemetry for interactive search
   track({
     event: 'find',
     query: '',
@@ -311,7 +293,6 @@ ${DIM}  2) npx skills add <owner/repo@skill>${RESET}`;
     return;
   }
 
-  // Use source (owner/repo) and skill name for installation
   const pkg = selected.source || selected.slug;
   const skillName = selected.name;
 
@@ -319,7 +300,6 @@ ${DIM}  2) npx skills add <owner/repo@skill>${RESET}`;
   console.log(`${TEXT}Installing ${BOLD}${skillName}${RESET} from ${DIM}${pkg}${RESET}...`);
   console.log();
 
-  // Run add directly since we're in the same CLI
   const { source, options } = parseAddOptions([pkg, '--skill', skillName]);
   await runAdd(source, options);
 

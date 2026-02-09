@@ -5,7 +5,7 @@ A simplified CLI for the open agent skills ecosystem. Fork of [vercel-labs/skill
 ## Install a Skill
 
 ```bash
-npx skulls add vercel-labs/agent-skills
+npx @juanibiapina/skulls add vercel-labs/agent-skills
 ```
 
 Skills are installed to `~/.agents/skills/` by default. Use `--target-dir` (`-d`) to override.
@@ -14,22 +14,22 @@ Skills are installed to `~/.agents/skills/` by default. Use `--target-dir` (`-d`
 
 ```bash
 # GitHub shorthand (owner/repo)
-npx skulls add vercel-labs/agent-skills
+npx @juanibiapina/skulls add vercel-labs/agent-skills
 
 # Full GitHub URL
-npx skulls add https://github.com/vercel-labs/agent-skills
+npx @juanibiapina/skulls add https://github.com/vercel-labs/agent-skills
 
 # Direct path to a skill in a repo
-npx skulls add https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines
+npx @juanibiapina/skulls add https://github.com/vercel-labs/agent-skills/tree/main/skills/web-design-guidelines
 
 # GitLab URL
-npx skulls add https://gitlab.com/org/repo
+npx @juanibiapina/skulls add https://gitlab.com/org/repo
 
 # Any git URL
-npx skulls add git@github.com:vercel-labs/agent-skills.git
+npx @juanibiapina/skulls add git@github.com:vercel-labs/agent-skills.git
 
 # Local path
-npx skulls add ./my-local-skills
+npx @juanibiapina/skulls add ./my-local-skills
 ```
 
 ### Options
@@ -47,10 +47,10 @@ npx skulls add ./my-local-skills
 
 ```bash
 # Using @skill syntax
-npx skulls add vercel-labs/agent-skills@web-design-guidelines
+npx @juanibiapina/skulls add vercel-labs/agent-skills@web-design-guidelines
 
 # Using --skill flag
-npx skulls add vercel-labs/agent-skills --skill web-design-guidelines
+npx @juanibiapina/skulls add vercel-labs/agent-skills --skill web-design-guidelines
 ```
 
 ## Commands
@@ -69,7 +69,7 @@ npx skulls add vercel-labs/agent-skills --skill web-design-guidelines
 ## Create a Skill
 
 ```bash
-npx skulls init my-skill
+npx @juanibiapina/skulls init my-skill
 ```
 
 This creates a `my-skill/SKILL.md` template. Skills are Markdown files with YAML frontmatter:

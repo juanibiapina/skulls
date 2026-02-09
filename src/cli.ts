@@ -163,10 +163,10 @@ Describe when this skill should be used.
   console.log();
   console.log(`${DIM}Publishing:${RESET}`);
   console.log(
-    `  ${DIM}GitHub:${RESET}  Push to a repo, then ${TEXT}npx skulls add <owner>/<repo>${RESET}`
+    `  ${DIM}GitHub:${RESET}  Push to a repo, then ${TEXT}npx @juanibiapina/skulls add <owner>/<repo>${RESET}`
   );
   console.log(
-    `  ${DIM}URL:${RESET}     Host the file, then ${TEXT}npx skulls add https://example.com/${displayPath}${RESET}`
+    `  ${DIM}URL:${RESET}     Host the file, then ${TEXT}npx @juanibiapina/skulls add https://example.com/${displayPath}${RESET}`
   );
   console.log();
   console.log(`Browse existing skills for inspiration at ${TEXT}https://skills.sh/${RESET}`);
@@ -235,7 +235,7 @@ async function runCheck(args: string[] = []): Promise<void> {
 
   if (skillNames.length === 0) {
     console.log(`${DIM}No skills tracked in lock file.${RESET}`);
-    console.log(`${DIM}Install skills with${RESET} ${TEXT}npx skulls add <package>${RESET}`);
+    console.log(`${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`);
     return;
   }
 
@@ -305,7 +305,7 @@ async function runCheck(args: string[] = []): Promise<void> {
     }
     console.log();
     console.log(
-      `${DIM}Run${RESET} ${TEXT}npx skulls update${RESET} ${DIM}to update all skills${RESET}`
+      `${DIM}Run${RESET} ${TEXT}npx @juanibiapina/skulls update${RESET} ${DIM}to update all skills${RESET}`
     );
   }
 
@@ -332,7 +332,7 @@ async function runUpdate(): Promise<void> {
 
   if (skillNames.length === 0) {
     console.log(`${DIM}No skills tracked in lock file.${RESET}`);
-    console.log(`${DIM}Install skills with${RESET} ${TEXT}npx skulls add <package>${RESET}`);
+    console.log(`${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`);
     return;
   }
 
@@ -398,7 +398,7 @@ async function runUpdate(): Promise<void> {
       installUrl = `${installUrl}/tree/main/${skillFolder}`;
     }
 
-    const result = spawnSync('npx', ['-y', 'skulls', 'add', installUrl, '-y'], {
+    const result = spawnSync('npx', ['-y', '@juanibiapina/skulls', 'add', installUrl, '-y'], {
       stdio: ['inherit', 'pipe', 'pipe'],
     });
 

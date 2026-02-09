@@ -542,10 +542,10 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
     );
     console.log();
     console.log(pc.dim('  Usage:'));
-    console.log(`    ${pc.cyan('npx skulls add')} ${pc.yellow('<source>')} ${pc.dim('[options]')}`);
+    console.log(`    ${pc.cyan('npx @juanibiapina/skulls add')} ${pc.yellow('<source>')} ${pc.dim('[options]')}`);
     console.log();
     console.log(pc.dim('  Example:'));
-    console.log(`    ${pc.cyan('npx skulls add')} ${pc.yellow('vercel-labs/agent-skills')}`);
+    console.log(`    ${pc.cyan('npx @juanibiapina/skulls add')} ${pc.yellow('vercel-labs/agent-skills')}`);
     console.log();
     process.exit(1);
   }

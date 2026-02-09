@@ -8,7 +8,6 @@ import { getInstallPath } from './installer.ts';
 import { DEFAULT_SKILLS_DIR } from './constants.ts';
 
 export interface RemoveOptions {
-  yes?: boolean;
   all?: boolean;
   targetDir?: string;
 }
@@ -73,24 +72,6 @@ export async function removeCommand(skillNames: string[], options: RemoveOptions
     }
 
     selectedSkills = selected as string[];
-  }
-
-  if (!options.yes) {
-    console.log();
-    p.log.info('Skills to remove:');
-    for (const skill of selectedSkills) {
-      p.log.message(`  ${pc.red('•')} ${skill}`);
-    }
-    console.log();
-
-    const confirmed = await p.confirm({
-      message: `Are you sure you want to uninstall ${selectedSkills.length} skill(s)?`,
-    });
-
-    if (p.isCancel(confirmed) || !confirmed) {
-      p.cancel('Removal cancelled');
-      process.exit(0);
-    }
   }
 
   spinner.start('Removing skills...');
@@ -182,9 +163,7 @@ export function parseRemoveOptions(args: string[]): { skills: string[]; options:
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg === '-y' || arg === '--yes') {
-      options.yes = true;
-    } else if (arg === '--all') {
+    if (arg === '--all') {
       options.all = true;
     } else if (arg === '-d' || arg === '--target-dir') {
       i++;

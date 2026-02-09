@@ -39,8 +39,7 @@ npx @juanibiapina/skulls add ./my-local-skills
 | `-d, --target-dir <dir>` | Install to a specific directory (default: `~/.agents/skills/`) |
 | `-s, --skill <names>`    | Install specific skills by name (use `*` for all)              |
 | `-l, --list`             | List available skills without installing                       |
-| `-y, --yes`              | Skip confirmation prompts                                      |
-| `--all`                  | Shorthand for `--skill '*' -y`                                 |
+| `--all`                  | Shorthand for `--skill '*'`                                    |
 | `--full-depth`           | Search all subdirectories even when a root SKILL.md exists     |
 
 ### Install a Specific Skill

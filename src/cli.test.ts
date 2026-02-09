@@ -17,7 +17,7 @@ describe('skulls CLI', () => {
       expect(output).toContain('-d, --target-dir');
       expect(output).toContain('-s, --skill');
       expect(output).toContain('-l, --list');
-      expect(output).toContain('-y, --yes');
+      expect(output).not.toContain('-y, --yes');
       expect(output).toContain('--all');
     });
 

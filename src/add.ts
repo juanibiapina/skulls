@@ -53,7 +53,6 @@ function shortenPath(fullPath: string, cwd: string): string {
 }
 
 export interface AddOptions {
-  yes?: boolean;
   skill?: string[];
   list?: boolean;
   all?: boolean;
@@ -142,17 +141,6 @@ async function handleRemoteSkill(
 
   console.log();
   p.note(summaryLines.join('\n'), 'Installation Summary');
-
-  if (!options.yes) {
-    const confirmed = await p.confirm({
-      message: 'Proceed with installation?',
-    });
-
-    if (p.isCancel(confirmed) || !confirmed) {
-      p.cancel('Installation cancelled');
-      process.exit(0);
-    }
-  }
 
   spinner.start('Installing skill...');
 
@@ -279,32 +267,14 @@ async function handleWellKnownSkills(
     p.log.info(
       `Selected ${selectedSkills.length} skill${selectedSkills.length !== 1 ? 's' : ''}: ${selectedSkills.map((s) => pc.cyan(s.installName)).join(', ')}`
     );
-  } else if (skills.length === 1) {
-    selectedSkills = skills;
-    const firstSkill = skills[0]!;
-    p.log.info(`Skill: ${pc.cyan(firstSkill.installName)}`);
-  } else if (options.yes) {
-    selectedSkills = skills;
-    p.log.info(`Installing all ${skills.length} skills`);
   } else {
-    const skillChoices = skills.map((s) => ({
-      value: s,
-      label: s.installName,
-      hint: s.description.length > 60 ? s.description.slice(0, 57) + '...' : s.description,
-    }));
-
-    const selected = await p.multiselect({
-      message: `Select skills to install ${pc.dim('(space to toggle)')}`,
-      options: skillChoices as p.Option<WellKnownSkill>[],
-      required: true,
-    });
-
-    if (p.isCancel(selected)) {
-      p.cancel('Installation cancelled');
-      process.exit(0);
+    selectedSkills = skills;
+    if (skills.length === 1) {
+      const firstSkill = skills[0]!;
+      p.log.info(`Skill: ${pc.cyan(firstSkill.installName)}`);
+    } else {
+      p.log.info(`Installing all ${skills.length} skills`);
     }
-
-    selectedSkills = selected as WellKnownSkill[];
   }
 
   const targetDir = resolveTargetDir(options);
@@ -325,15 +295,6 @@ async function handleWellKnownSkills(
 
   console.log();
   p.note(summaryLines.join('\n'), 'Installation Summary');
-
-  if (!options.yes) {
-    const confirmed = await p.confirm({ message: 'Proceed with installation?' });
-
-    if (p.isCancel(confirmed) || !confirmed) {
-      p.cancel('Installation cancelled');
-      process.exit(0);
-    }
-  }
 
   spinner.start('Installing skills...');
 
@@ -482,17 +443,6 @@ async function handleDirectUrlSkillLegacy(
   console.log();
   p.note(summaryLines.join('\n'), 'Installation Summary');
 
-  if (!options.yes) {
-    const confirmed = await p.confirm({
-      message: 'Proceed with installation?',
-    });
-
-    if (p.isCancel(confirmed) || !confirmed) {
-      p.cancel('Installation cancelled');
-      process.exit(0);
-    }
-  }
-
   spinner.start('Installing skill...');
 
   const result = await installRemoteSkill(remoteSkill, targetDir);
@@ -542,18 +492,21 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
     );
     console.log();
     console.log(pc.dim('  Usage:'));
-    console.log(`    ${pc.cyan('npx @juanibiapina/skulls add')} ${pc.yellow('<source>')} ${pc.dim('[options]')}`);
+    console.log(
+      `    ${pc.cyan('npx @juanibiapina/skulls add')} ${pc.yellow('<source>')} ${pc.dim('[options]')}`
+    );
     console.log();
     console.log(pc.dim('  Example:'));
-    console.log(`    ${pc.cyan('npx @juanibiapina/skulls add')} ${pc.yellow('vercel-labs/agent-skills')}`);
+    console.log(
+      `    ${pc.cyan('npx @juanibiapina/skulls add')} ${pc.yellow('vercel-labs/agent-skills')}`
+    );
     console.log();
     process.exit(1);
   }
 
-  // --all implies --skill '*' and -y
+  // --all implies --skill '*'
   if (options.all) {
     options.skill = ['*'];
-    options.yes = true;
   }
 
   console.log();
@@ -661,34 +614,15 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
       p.log.info(
         `Selected ${selectedSkills.length} skill${selectedSkills.length !== 1 ? 's' : ''}: ${selectedSkills.map((s) => pc.cyan(getSkillDisplayName(s))).join(', ')}`
       );
-    } else if (skills.length === 1) {
-      selectedSkills = skills;
-      const firstSkill = skills[0]!;
-      p.log.info(`Skill: ${pc.cyan(getSkillDisplayName(firstSkill))}`);
-      p.log.message(pc.dim(firstSkill.description));
-    } else if (options.yes) {
-      selectedSkills = skills;
-      p.log.info(`Installing all ${skills.length} skills`);
     } else {
-      const skillChoices = skills.map((s) => ({
-        value: s,
-        label: getSkillDisplayName(s),
-        hint: s.description.length > 60 ? s.description.slice(0, 57) + '...' : s.description,
-      }));
-
-      const selected = await p.multiselect({
-        message: `Select skills to install ${pc.dim('(space to toggle)')}`,
-        options: skillChoices as p.Option<Skill>[],
-        required: true,
-      });
-
-      if (p.isCancel(selected)) {
-        p.cancel('Installation cancelled');
-        await cleanup(tempDir);
-        process.exit(0);
+      selectedSkills = skills;
+      if (skills.length === 1) {
+        const firstSkill = skills[0]!;
+        p.log.info(`Skill: ${pc.cyan(getSkillDisplayName(firstSkill))}`);
+        p.log.message(pc.dim(firstSkill.description));
+      } else {
+        p.log.info(`Installing all ${skills.length} skills`);
       }
-
-      selectedSkills = selected as Skill[];
     }
 
     const targetDir = resolveTargetDir(options);
@@ -721,16 +655,6 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
 
     console.log();
     p.note(summaryLines.join('\n'), 'Installation Summary');
-
-    if (!options.yes) {
-      const confirmed = await p.confirm({ message: 'Proceed with installation?' });
-
-      if (p.isCancel(confirmed) || !confirmed) {
-        p.cancel('Installation cancelled');
-        await cleanup(tempDir);
-        process.exit(0);
-      }
-    }
 
     spinner.start('Installing skills...');
 
@@ -881,9 +805,7 @@ export function parseAddOptions(args: string[]): { source: string[]; options: Ad
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg === '-y' || arg === '--yes') {
-      options.yes = true;
-    } else if (arg === '-l' || arg === '--list') {
+    if (arg === '-l' || arg === '--list') {
       options.list = true;
     } else if (arg === '--all') {
       options.all = true;

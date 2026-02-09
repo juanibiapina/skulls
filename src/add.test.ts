@@ -28,7 +28,7 @@ describe('add command', () => {
   });
 
   it('should show error for non-existent local path', () => {
-    const result = runCli(['add', './non-existent-path', '-y'], testDir);
+    const result = runCli(['add', './non-existent-path'], testDir);
     expect(result.stdout).toContain('Local path does not exist');
     expect(result.exitCode).toBe(1);
   });
@@ -56,7 +56,7 @@ This is a test skill.
   });
 
   it('should show no skills found for empty directory', () => {
-    const result = runCli(['add', testDir, '-y'], testDir);
+    const result = runCli(['add', testDir], testDir);
     expect(result.stdout).toContain('No skills found');
     expect(result.stdout).toContain('No valid skills found');
     expect(result.exitCode).toBe(1);
@@ -81,7 +81,7 @@ Instructions here.
     const targetDir = join(testDir, 'target-skills');
     mkdirSync(targetDir, { recursive: true });
 
-    const result = runCli(['add', testDir, '-y', '-d', targetDir], testDir);
+    const result = runCli(['add', testDir, '-d', targetDir], testDir);
     expect(result.stdout).toContain('my-skill');
     expect(result.stdout).toContain('Done!');
     expect(result.exitCode).toBe(0);
@@ -255,10 +255,9 @@ describe('parseAddOptions', () => {
   });
 
   it('should parse combined flags with wildcards', () => {
-    const result = parseAddOptions(['source', '--skill', '*', '-y']);
+    const result = parseAddOptions(['source', '--skill', '*']);
     expect(result.source).toEqual(['source']);
     expect(result.options.skill).toEqual(['*']);
-    expect(result.options.yes).toBe(true);
   });
 
   it('should parse --full-depth flag', () => {

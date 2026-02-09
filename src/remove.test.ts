@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { runCli, runCliWithInput } from './test-utils.ts';
+import { runCli } from './test-utils.ts';
 
 describe('remove command', () => {
   let testDir: string;
@@ -40,14 +40,14 @@ This is a test skill.
 
   describe('with no skills installed', () => {
     it('should show message when no skills found', () => {
-      const result = runCli(['remove', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', '-d', skillsDir], testDir);
       expect(result.stdout).toContain('No skills found');
       expect(result.stdout).toContain('to remove');
       expect(result.exitCode).toBe(0);
     });
 
     it('should show error for non-existent skill name', () => {
-      const result = runCli(['remove', 'non-existent-skill', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', 'non-existent-skill', '-d', skillsDir], testDir);
       expect(result.stdout).toContain('No skills found');
       expect(result.exitCode).toBe(0);
     });
@@ -61,7 +61,7 @@ This is a test skill.
     });
 
     it('should remove specific skill by name with -y flag', () => {
-      const result = runCli(['remove', 'skill-one', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', 'skill-one', '-d', skillsDir], testDir);
 
       expect(result.stdout).toContain('Successfully removed');
       expect(result.stdout).toContain('1 skill');
@@ -72,7 +72,7 @@ This is a test skill.
     });
 
     it('should remove multiple skills by name', () => {
-      const result = runCli(['remove', 'skill-one', 'skill-two', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', 'skill-one', 'skill-two', '-d', skillsDir], testDir);
 
       expect(result.stdout).toContain('Successfully removed');
       expect(result.stdout).toContain('2 skill');
@@ -83,7 +83,7 @@ This is a test skill.
     });
 
     it('should remove all skills with --all flag', () => {
-      const result = runCli(['remove', '--all', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', '--all', '-d', skillsDir], testDir);
 
       expect(result.stdout).toContain('Successfully removed');
       expect(result.stdout).toContain('3 skill');
@@ -94,33 +94,25 @@ This is a test skill.
     });
 
     it('should show error for non-existent skill name when skills exist', () => {
-      const result = runCli(['remove', 'non-existent', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', 'non-existent', '-d', skillsDir], testDir);
 
       expect(result.stdout).toContain('No matching skills');
       expect(result.exitCode).toBe(0);
     });
 
     it('should be case-insensitive when matching skill names', () => {
-      const result = runCli(['remove', 'SKILL-ONE', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', 'SKILL-ONE', '-d', skillsDir], testDir);
 
       expect(result.stdout).toContain('Successfully removed');
       expect(existsSync(join(skillsDir, 'skill-one'))).toBe(false);
     });
 
-    it('should list skills to remove before confirmation', () => {
-      const result = runCliWithInput(
-        ['remove', 'skill-one', 'skill-two', '-d', skillsDir],
-        'n',
-        testDir
-      );
+    it('should remove skills without confirmation', () => {
+      const result = runCli(['remove', 'skill-one', 'skill-two', '-d', skillsDir], testDir);
 
-      expect(result.stdout).toContain('Skills to remove');
-      expect(result.stdout).toContain('skill-one');
-      expect(result.stdout).toContain('skill-two');
-      expect(result.stdout).toContain('uninstall');
-
-      expect(existsSync(join(skillsDir, 'skill-one'))).toBe(true);
-      expect(existsSync(join(skillsDir, 'skill-two'))).toBe(true);
+      expect(result.stdout).toContain('Successfully removed');
+      expect(existsSync(join(skillsDir, 'skill-one'))).toBe(false);
+      expect(existsSync(join(skillsDir, 'skill-two'))).toBe(false);
     });
   });
 
@@ -171,7 +163,7 @@ This is a test skill.
       expect(result.stdout).toContain('Usage');
       expect(result.stdout).toContain('remove');
       expect(result.stdout).toContain('--target-dir');
-      expect(result.stdout).toContain('--yes');
+      expect(result.stdout).not.toContain('--yes');
       expect(result.exitCode).toBe(0);
     });
 
@@ -187,13 +179,8 @@ This is a test skill.
       createTestSkill('parse-test-skill');
     });
 
-    it('should parse --yes flag', () => {
-      const result = runCli(['remove', 'parse-test-skill', '--yes', '-d', skillsDir], testDir);
-      expect(result.exitCode).toBe(0);
-    });
-
     it('should parse -d as target-dir', () => {
-      const result = runCli(['remove', 'parse-test-skill', '-y', '-d', skillsDir], testDir);
+      const result = runCli(['remove', 'parse-test-skill', '-d', skillsDir], testDir);
       expect(result.stdout).toContain('Successfully removed');
     });
   });

@@ -89,10 +89,8 @@ Learn more: https://skills.sh/vercel-labs/agent-skills/vercel-react-best-practic
 If the user wants to proceed, you can install the skill for them:
 
 ```bash
-npx @juanibiapina/skulls add <owner/repo@skill> -y
+npx @juanibiapina/skulls add <owner/repo@skill>
 ```
-
-The `-y` flag skips confirmation prompts.
 
 ## Common Skill Categories
 

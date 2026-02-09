@@ -51,7 +51,9 @@ export async function runList(args: string[]): Promise<void> {
   if (installedSkills.length === 0) {
     const shortTarget = shortenPath(targetDir, cwd);
     console.log(`${DIM}No skills found in ${shortTarget}${RESET}`);
-    console.log(`${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`);
+    console.log(
+      `${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`
+    );
     return;
   }
 

@@ -52,13 +52,11 @@ ${BOLD}Add Options:${RESET}
   -d, --target-dir <dir>  Install to a specific directory (default: ${DEFAULT_SKILLS_DIR})
   -s, --skill <skills>    Specify skill names to install (use '*' for all skills)
   -l, --list              List available skills in the repository without installing
-  -y, --yes               Skip confirmation prompts
-  --all                   Shorthand for --skill '*' -y
+  --all                   Shorthand for --skill '*'
   --full-depth            Search all subdirectories even when a root SKILL.md exists
 
 ${BOLD}Remove Options:${RESET}
   -d, --target-dir <dir>  Target directory (default: ${DEFAULT_SKILLS_DIR})
-  -y, --yes               Skip confirmation prompts
   --all                   Remove all skills
 
 ${BOLD}List Options:${RESET}
@@ -97,13 +95,12 @@ ${BOLD}Arguments:${RESET}
 
 ${BOLD}Options:${RESET}
   -d, --target-dir <dir>  Target directory (default: ${DEFAULT_SKILLS_DIR})
-  -y, --yes               Skip confirmation prompts
   --all                   Remove all skills
 
 ${BOLD}Examples:${RESET}
   ${DIM}$${RESET} skulls remove                       ${DIM}# interactive selection${RESET}
   ${DIM}$${RESET} skulls remove my-skill
-  ${DIM}$${RESET} skulls remove skill1 skill2 -y
+  ${DIM}$${RESET} skulls remove skill1 skill2
   ${DIM}$${RESET} skulls remove --all
 
 Discover more skills at ${TEXT}https://skills.sh/${RESET}
@@ -235,7 +232,9 @@ async function runCheck(args: string[] = []): Promise<void> {
 
   if (skillNames.length === 0) {
     console.log(`${DIM}No skills tracked in lock file.${RESET}`);
-    console.log(`${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`);
+    console.log(
+      `${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`
+    );
     return;
   }
 
@@ -332,7 +331,9 @@ async function runUpdate(): Promise<void> {
 
   if (skillNames.length === 0) {
     console.log(`${DIM}No skills tracked in lock file.${RESET}`);
-    console.log(`${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`);
+    console.log(
+      `${DIM}Install skills with${RESET} ${TEXT}npx @juanibiapina/skulls add <package>${RESET}`
+    );
     return;
   }
 
@@ -398,7 +399,7 @@ async function runUpdate(): Promise<void> {
       installUrl = `${installUrl}/tree/main/${skillFolder}`;
     }
 
-    const result = spawnSync('npx', ['-y', '@juanibiapina/skulls', 'add', installUrl, '-y'], {
+    const result = spawnSync('npx', ['-y', '@juanibiapina/skulls', 'add', installUrl], {
       stdio: ['inherit', 'pipe', 'pipe'],
     });
 
